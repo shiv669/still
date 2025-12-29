@@ -1,11 +1,15 @@
 import { ForumClient } from "@foru-ms/sdk"
 import type { ThreadMetadata, PostMetadata } from "./types"
 
-const API_KEY = "272e5341-475c-474d-a450-ae60d0d512c6"
+const API_KEY = process.env.FORUMS_API_KEY
+
+if (!API_KEY) {
+  console.warn("[v0] FORUMS_API_KEY not set - Foru.ms integration may not work")
+}
 
 // Initialize the SDK with API key
 const client = new ForumClient({
-  apiKey: API_KEY,
+  apiKey: API_KEY || "",
 })
 
 // Thread interface matching Foru.ms API response

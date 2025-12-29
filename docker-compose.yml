@@ -10,7 +10,7 @@ services:
     environment:
       - NODE_ENV=production
       - GROQ_API_KEY=${GROQ_API_KEY}
-      - FORUMBS_API_KEY=${FORUMBS_API_KEY:-}
+      - FORUMS_API_KEY=${FORUMS_API_KEY}
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
     restart: unless-stopped
     healthcheck:
