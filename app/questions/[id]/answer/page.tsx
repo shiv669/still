@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, use } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -10,8 +10,8 @@ import { Label } from "@/components/ui/label"
 import { StillHeader } from "@/components/still-header"
 import { ArrowLeft, Loader2 } from "lucide-react"
 
-export default function NewAnswerPage({ params }: { params: { id: string } }) {
-  const { id } = params
+export default function NewAnswerPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params)
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [content, setContent] = useState("")

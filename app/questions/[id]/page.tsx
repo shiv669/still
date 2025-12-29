@@ -52,8 +52,8 @@ function NotFoundPage() {
   )
 }
 
-export default async function QuestionPage({ params }: { params: { id: string } }) {
-  const { id } = params
+export default async function QuestionPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
 
   if (id === "new") {
     const { default: NewQuestionPage } = await import("../new/page")

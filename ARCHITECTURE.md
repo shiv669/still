@@ -1,180 +1,317 @@
-# Still — System Architecture
+# Still - How It's Built
 
-This document explains how Still is built and why the system behaves the way it does.
-It focuses on core mechanisms, not marketing or unnecessary implementation detail.
+This document explains the technical decisions behind Still. Not marketing - just how things actually work and why.
 
 ---
 
-## Core Architecture Idea
+## The Core Idea
 
-Every answer carries freshness metadata stored directly in Foru.ms using the `extendedData` field.
+Every answer has metadata that tracks its freshness. This metadata lives in Foru.ms's `extendedData` field, so we don't need a separate database.
 
-This design means:
-- No separate database
-- No synchronization issues
-- State can always be recomputed
-
-The system never trusts stored state.  
-Freshness is recalculated from metadata and current time on every read.
-
-```ts
+\`\`\`typescript
 interface FreshnessMetadata {
-  created_at: string
-  last_verified_at: string
-  freshness_window_days: number
+  created_at: string           // When the answer was posted
+  last_verified_at: string     // Last time someone clicked "Still True"
+  freshness_window_days: number // How long before it needs reverification
   state: "VERIFIED" | "POSSIBLY_OUTDATED" | "OUTDATED"
-  verification_score: number
-  verification_count: number
-  outdated_reports: number
+  verification_score: number   // 0.0 to 1.0 confidence
+  verification_count: number   // Total verifications received
+  outdated_reports: number     // Times marked as outdated
 }
-```
+\`\`\`
+
+The state is always recalculated from this data. We never trust a stored state - we compute it fresh every time.
 
 ---
 
-## Deterministic Freshness Engine
+## State Machine
 
-Freshness is controlled by a pure, deterministic state machine.
+The freshness state is deterministic. Given the metadata and current time, the state is always the same:
 
-Given the same metadata and time, the output state is always the same. There are no side effects and no hidden state.
+\`\`\`
+                    ┌─────────────┐
+                    │  VERIFIED   │
+                    └──────┬──────┘
+                           │
+         ┌─────────────────┼─────────────────┐
+         │                 │                 │
+    Time passes     Score < 0.3      3+ reports
+         │                 │                 │
+         ▼                 │                 │
+┌─────────────────┐        │                 │
+│ POSSIBLY_OUTDATED│       │                 │
+└────────┬────────┘        │                 │
+         │                 │                 │
+         └─────────────────┴─────────────────┘
+                           │
+                           ▼
+                    ┌───────────┐
+                    │  OUTDATED │
+                    └───────────┘
+\`\`\`
 
-### State Evaluation Order
+**Rules in order of precedence:**
 
-Rules are applied in strict priority order:
+1. **Community override**: 3+ outdated reports → OUTDATED (no exceptions)
+2. **Low confidence**: Score below 0.3 → OUTDATED
+3. **No votes yet**: Zero verifications AND zero reports → POSSIBLY_OUTDATED
+4. **Time decay**: Past 1.5x window → OUTDATED, past 1x window → POSSIBLY_OUTDATED
+5. **Default**: VERIFIED
 
-1. **Community override:** `outdated_reports > 2` → **OUTDATED**
-2. **Low confidence:** `verification_score < 0.3` → **OUTDATED**
-3. **No activity:** no verifications and no reports → **POSSIBLY_OUTDATED**
-4. **Severe time decay:** `age > window × 1.5` → **OUTDATED**
-5. **Moderate time decay:** `age > window` → **POSSIBLY_OUTDATED**
-6. **Default:** **VERIFIED**
-
-Community signals always take precedence over time or AI input.
+The order matters. Community reports trump everything else. A perfectly timed answer with a high score still goes OUTDATED if three people report it.
 
 ---
 
-## Verification Mechanics
+## Verification Processing
 
-**Still True**
-* Increases verification score using diminishing returns
-* Updates the last verification timestamp
-* Gradually heals outdated reports
+When someone clicks "Still True" or "Outdated":
 
-**Outdated**
-* Decreases verification score
-* Increments outdated report count
+### "Still True" (verify)
+\`\`\`typescript
+// Diminishing returns formula
+boost = 0.1 * (1 / sqrt(verification_count + 1))
 
-This prevents spam, accidental immortality of answers, and single-user dominance.
+// First verification: +0.1
+// Second: +0.07
+// Third: +0.058
+// ...keeps getting smaller
+
+score = min(1.0, score + boost)
+last_verified_at = now
+outdated_reports = max(0, outdated_reports - 1)  // Heals one report
+\`\`\`
+
+### "Outdated" (report)
+\`\`\`typescript
+penalty = 0.15
+score = max(0, score - penalty)
+outdated_reports++
+\`\`\`
+
+The diminishing returns are intentional. One person verifying an answer 50 times shouldn't make it immortal. But multiple different people verifying? That's signal.
 
 ---
 
 ## Question Classification
 
-When a question is created, the system assigns a freshness window.
+When a question is posted, we try to figure out what category it is:
 
-**Primary Path**
-* Uses Groq (Llama 3.x)
-* Classifies questions into:
-    * `fast-changing-tech`
-    * `stable-concept`
-    * `opinion`
-    * `policy`
+### LLM Path (Groq)
+\`\`\`typescript
+const prompt = `Classify this question:
+- fast-changing-tech (90 days): Framework APIs, library versions
+- stable-concept (365 days): Algorithms, design patterns
+- opinion (180 days): Best practices, recommendations
+- policy (180 days): Rules, guidelines`
+\`\`\`
 
-**Fallback Path**
-* Keyword-based heuristics
-* Ensures full functionality without AI
+We use Groq's Llama 3.3 70B because it's fast (~500ms) and good enough for classification.
 
-Classification affects decay speed only. It never determines correctness.
+### Heuristic Fallback
+If Groq fails (timeout, rate limit, down), we fall back to keyword matching:
 
----
+\`\`\`typescript
+const techKeywords = ["react", "nextjs", "api", "version", "update"]
+const stableKeywords = ["algorithm", "pattern", "theory", "concept"]
+const opinionKeywords = ["best", "should", "recommend", "vs"]
 
-## AI Context (Advisory Only)
+// Count matches, pick highest
+\`\`\`
 
-The AI Context feature:
-* Analyzes answers against known patterns
-* Highlights potentially outdated assumptions
-* Explains risks in plain language
-
-**AI output:**
-* Never changes answer state
-* Never mutates stored data
-* Never overrides community actions
-
-AI informs decisions. Humans make them.
+Not perfect, but better than nothing. The system keeps working without AI.
 
 ---
 
-## Frontend Architecture
+## AI Assessment (AI Context Button)
 
-**Next.js App Router**
-* Client components for interactive flows
-* Loading states instead of blocking renders
-* Optimistic UI for verification actions
+When you click "AI Context", here's what happens:
 
-The interface is designed so users understand the system without reading documentation.
+1. **Gather context**: We build a list of relevant documentation sources based on keywords
+2. **Build prompt**: Question + Answer + Time since posted + Documentation hints
+3. **Call Groq**: Ask if the answer is still accurate
+4. **Parse response**: Extract is_outdated, confidence_delta, reasoning, potential_issues
+
+\`\`\`typescript
+const assessment = {
+  is_outdated: boolean,        // AI's verdict
+  confidence_delta: -1 to +1,  // How much to adjust score
+  reasoning: string,           // Plain English explanation
+  potential_issues: string[]   // Specific problems found
+}
+\`\`\`
+
+Important: The AI assessment is shown to the user but doesn't automatically change anything. The user decides whether to verify or report based on the AI's analysis.
 
 ---
 
-## API Surface
+## Vote Persistence
 
-The API is intentionally minimal:
-* Create questions (with classification metadata)
-* Create answers (with freshness initialization)
-* Verify or report answers
-* Request AI context
+We track votes in localStorage:
 
-All business logic lives in shared libraries, not API routes.
+\`\`\`typescript
+// Key: "still_votes"
+// Value: { [postId]: "verify" | "report_outdated" }
+
+function getUserVote(postId: string): "verify" | "report_outdated" | null {
+  const votes = JSON.parse(localStorage.getItem("still_votes") || "{}")
+  return votes[postId] || null
+}
+\`\`\`
+
+This prevents:
+- Spam clicking the same button
+- Voting both ways on the same answer
+- Losing your vote on page reload
+
+You CAN switch your vote (verify → outdated or vice versa), but you can't vote the same way twice.
 
 ---
 
-## Failure & Fallback Philosophy
+## Featured Question Algorithm
 
-Every dependency has a safe failure mode:
+The homepage doesn't just show the latest question. It picks the most engaging one:
 
-| Dependency | Behavior on Failure |
-| :--- | :--- |
-| **AI** | Feature disables, core system continues |
-| **Foru.ms latency** | UI shows loading or error state |
-| **Classification** | Heuristic fallback |
-| **Verification** | Deterministic recomputation |
+\`\`\`typescript
+// Fetch answers for top 5 most recent threads
+const candidates = threads.slice(0, 5)
 
-The system never silently lies to the user.
+for (const thread of candidates) {
+  const posts = await fetchPosts(thread.id)
+  
+  // Calculate engagement
+  const answerCount = posts.length
+  const totalVotes = posts.reduce((sum, post) => {
+    const meta = post.extendedData?.freshness
+    return sum + (meta?.verification_count || 0) + (meta?.outdated_reports || 0)
+  }, 0)
+  
+  thread.engagement = answerCount * 2 + totalVotes
+}
+
+// Feature the highest engagement thread that has at least 1 answer
+const featured = candidates
+  .filter(t => t.answerCount > 0)
+  .sort((a, b) => b.engagement - a.engagement)[0]
+\`\`\`
+
+This ensures judges see a thread with actual activity, not just an empty question.
+
+---
+
+## API Routes
+
+### POST /api/threads
+Create a question. Runs classification, stores metadata.
+
+### POST /api/threads/[id]/posts
+Create an answer. Initializes freshness metadata with POSSIBLY_OUTDATED state and 0.5 score.
+
+### POST /api/posts/[postId]/verify
+Process a verification action. Updates metadata, recalculates state.
+
+### POST /api/posts/[postId]/assess
+Run AI assessment. Returns analysis without modifying anything.
+
+### GET /api/threads/[id]/posts
+List answers for a question. Used by featured question component.
+
+---
+
+## Error Handling Philosophy
+
+Every component has a fallback:
+
+| Component | Primary | Fallback |
+|-----------|---------|----------|
+| Classification | Groq LLM | Keyword heuristics |
+| Assessment | Groq LLM | Neutral response ("Unable to assess") |
+| Post Update | Foru.ms API | Return success anyway (data in memory) |
+| User Auth | Foru.ms login | Create anonymous user |
+
+The app never shows a blank screen. Something always renders.
+
+---
+
+## Rate Limiting
+
+### AI Context Button
+30-second cooldown per answer. Stored in component state, resets on page reload. Prevents API abuse.
+
+### Vote Buttons
+One vote per answer per type, persisted in localStorage. No cooldown needed since you can't repeat votes.
 
 ---
 
 ## Performance Decisions
 
-* Metadata stored with content avoids joins
-* Limited-scope engagement checks
-* Parallel API requests where possible
-* No background jobs required for correctness
+### Why Client-Side Data Fetching?
+The home page fetches threads client-side with useEffect. This means:
+- Page shell renders instantly
+- Data streams in with skeleton loading states
+- No server-side blocking on slow Foru.ms API
 
-The system scales conceptually before scaling infrastructure.
+### Why Only Check Top 5 for Featured?
+Checking engagement for all 20+ threads would make 20+ API calls. We limit to 5 because:
+- Most engagement happens on recent threads anyway
+- 5 parallel calls is acceptable (~1s total)
+- Good enough for hackathon demo
 
----
-
-## Demo Scope Notes
-
-This is a hackathon demo, not production software.
-
-**Out of scope by design:**
-* Real authentication
-* Cross-device identity
-* Distributed caching
-* Advanced abuse prevention
-
-**What is proven:**
-* Time-based decay works
-* Community overrides work
-* AI assists safely
-* The core idea survives real usage
+### Why No Server Components for Lists?
+Server components would block rendering until Foru.ms responds. Client components with loading states give better perceived performance.
 
 ---
 
-## Architectural Truth
+## What We'd Do Differently in Production
 
-Still is simple by constraint, not by accident.
+1. **Real authentication** - Currently using auto-generated anonymous users
+2. **Redis cache** - In-memory cache doesn't survive deployments
+3. **WebSocket updates** - Real-time verification count changes
+4. **Rate limiting middleware** - Server-side protection
+5. **Proper error tracking** - Sentry or similar
+6. **Analytics** - Track verification patterns, decay rates
 
-> Answers decay.
-> People verify.
-> AI explains.
-> Time enforces honesty.
+---
+
+## File-by-File Breakdown
+
+### Core Logic
+- `lib/freshness/state-machine.ts` - The 50 lines that decide everything
+- `lib/freshness/engine.ts` - Processes verifications, updates scores
+- `lib/llm/classifier.ts` - Question categorization (LLM + fallback)
+- `lib/llm/verifier.ts` - AI assessment with web context
+
+### API Layer
+- `app/api/threads/route.ts` - List and create questions
+- `app/api/posts/[postId]/verify/route.ts` - Handle votes
+- `app/api/posts/[postId]/assess/route.ts` - AI analysis
+
+### UI Components
+- `components/featured-question.tsx` - Homepage showcase with inline voting
+- `components/freshness-badge.tsx` - Visual state indicators
+- `components/verification-actions.tsx` - Reusable vote buttons
+
+### Pages
+- `app/page.tsx` - Home with featured question + recent list
+- `app/questions/[id]/page.tsx` - Question detail with all answers
+- `app/questions/new/page.tsx` - Ask a question form
+- `app/questions/[id]/answer/page.tsx` - Submit an answer form
+
+---
+
+## The Honest Truth
+
+This is a hackathon project. It demonstrates a concept, not production infrastructure.
+
+What works well:
+- The core decay logic is solid
+- AI integration is graceful (fails safely)
+- UI is clean and responsive
+- Vote tracking prevents abuse
+
+What's hacky:
+- Foru.ms API credentials are in the code
+- No real user accounts
+- localStorage for vote tracking
+- In-memory caching only
+
+But the core idea - **answers that expire unless verified** - is proven by the implementation. Everything else is engineering work.
