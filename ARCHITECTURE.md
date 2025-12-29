@@ -8,7 +8,7 @@ This document explains the technical decisions behind Still. Not marketing - jus
 
 Every answer has metadata that tracks its freshness. This metadata lives in Foru.ms's `extendedData` field, so we don't need a separate database.
 
-```typescript
+\`\`\`typescript
 interface FreshnessMetadata {
   created_at: string           // When the answer was posted
   last_verified_at: string     // Last time someone clicked "Still True"
@@ -18,7 +18,7 @@ interface FreshnessMetadata {
   verification_count: number   // Total verifications received
   outdated_reports: number     // Times marked as outdated
 }
-```
+\`\`\`
 
 The state is always recalculated from this data. We never trust a stored state - we compute it fresh every time.
 
@@ -28,7 +28,7 @@ The state is always recalculated from this data. We never trust a stored state -
 
 The freshness state is deterministic. Given the metadata and current time, the state is always the same:
 
-```
+\`\`\`
                     ┌─────────────┐
                     │  VERIFIED   │
                     └──────┬──────┘
@@ -48,7 +48,7 @@ The freshness state is deterministic. Given the metadata and current time, the s
                     ┌───────────┐
                     │  OUTDATED │
                     └───────────┘
-```
+\`\`\`
 
 **Rules in order of precedence:**
 
@@ -67,7 +67,7 @@ The order matters. Community reports trump everything else. A perfectly timed an
 When someone clicks "Still True" or "Outdated":
 
 ### "Still True" (verify)
-```typescript
+\`\`\`typescript
 // Diminishing returns formula
 boost = 0.1 * (1 / sqrt(verification_count + 1))
 
@@ -79,14 +79,14 @@ boost = 0.1 * (1 / sqrt(verification_count + 1))
 score = min(1.0, score + boost)
 last_verified_at = now
 outdated_reports = max(0, outdated_reports - 1)  // Heals one report
-```
+\`\`\`
 
 ### "Outdated" (report)
-```typescript
+\`\`\`typescript
 penalty = 0.15
 score = max(0, score - penalty)
 outdated_reports++
-```
+\`\`\`
 
 The diminishing returns are intentional. One person verifying an answer 50 times shouldn't make it immortal. But multiple different people verifying? That's signal.
 
@@ -97,26 +97,26 @@ The diminishing returns are intentional. One person verifying an answer 50 times
 When a question is posted, we try to figure out what category it is:
 
 ### LLM Path (Groq)
-```typescript
+\`\`\`typescript
 const prompt = `Classify this question:
 - fast-changing-tech (90 days): Framework APIs, library versions
 - stable-concept (365 days): Algorithms, design patterns
 - opinion (180 days): Best practices, recommendations
 - policy (180 days): Rules, guidelines`
-```
+\`\`\`
 
 We use Groq's Llama 3.3 70B because it's fast (~500ms) and good enough for classification.
 
 ### Heuristic Fallback
 If Groq fails (timeout, rate limit, down), we fall back to keyword matching:
 
-```typescript
+\`\`\`typescript
 const techKeywords = ["react", "nextjs", "api", "version", "update"]
 const stableKeywords = ["algorithm", "pattern", "theory", "concept"]
 const opinionKeywords = ["best", "should", "recommend", "vs"]
 
 // Count matches, pick highest
-```
+\`\`\`
 
 Not perfect, but better than nothing. The system keeps working without AI.
 
@@ -131,14 +131,14 @@ When you click "AI Context", here's what happens:
 3. **Call Groq**: Ask if the answer is still accurate
 4. **Parse response**: Extract is_outdated, confidence_delta, reasoning, potential_issues
 
-```typescript
+\`\`\`typescript
 const assessment = {
   is_outdated: boolean,        // AI's verdict
   confidence_delta: -1 to +1,  // How much to adjust score
   reasoning: string,           // Plain English explanation
   potential_issues: string[]   // Specific problems found
 }
-```
+\`\`\`
 
 Important: The AI assessment is shown to the user but doesn't automatically change anything. The user decides whether to verify or report based on the AI's analysis.
 
@@ -148,7 +148,7 @@ Important: The AI assessment is shown to the user but doesn't automatically chan
 
 We track votes in localStorage:
 
-```typescript
+\`\`\`typescript
 // Key: "still_votes"
 // Value: { [postId]: "verify" | "report_outdated" }
 
@@ -156,7 +156,7 @@ function getUserVote(postId: string): "verify" | "report_outdated" | null {
   const votes = JSON.parse(localStorage.getItem("still_votes") || "{}")
   return votes[postId] || null
 }
-```
+\`\`\`
 
 This prevents:
 - Spam clicking the same button
@@ -171,7 +171,7 @@ You CAN switch your vote (verify → outdated or vice versa), but you can't vote
 
 The homepage doesn't just show the latest question. It picks the most engaging one:
 
-```typescript
+\`\`\`typescript
 // Fetch answers for top 5 most recent threads
 const candidates = threads.slice(0, 5)
 
@@ -192,7 +192,7 @@ for (const thread of candidates) {
 const featured = candidates
   .filter(t => t.answerCount > 0)
   .sort((a, b) => b.engagement - a.engagement)[0]
-```
+\`\`\`
 
 This ensures judges see a thread with actual activity, not just an empty question.
 

@@ -97,7 +97,7 @@ No maintenance needed. The system enforces honesty by default.
 
 ## Project Structure
 
-```
+\`\`\`
 still/
 ├── app/
 │   ├── page.tsx                    # Home - featured question + recent threads
@@ -123,7 +123,7 @@ still/
 │   │   └── verifier.ts             # Answer assessment
 │   └── foru-ms/
 │       └── client.ts               # Forum API wrapper
-```
+\`\`\`
 
 ---
 
@@ -147,7 +147,7 @@ AI Context has a 30-second cooldown per answer. Prevents API abuse and makes use
 
 ## Running Locally
 
-```bash
+\`\`\`bash
 # Clone and install
 git clone <repo>
 cd still
@@ -158,7 +158,7 @@ echo "GROQ_API_KEY=your_key_here" > .env.local
 
 # Run
 npm run dev
-```
+\`\`\`
 
 ---
 
