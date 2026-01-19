@@ -97,38 +97,6 @@ No maintenance needed. The system enforces honesty by default.
 
 ---
 
-## Project Structure
-
-\`\`\`
-still/
-├── app/
-│   ├── page.tsx                    # Home - featured question + recent threads
-│   ├── questions/
-│   │   ├── new/                    # Ask a new question
-│   │   └── [id]/                   # Question detail + answers
-│   │       └── answer/             # Submit an answer
-│   └── api/
-│       ├── threads/                # Create/list questions
-│       └── posts/[postId]/
-│           ├── verify/             # Community verification
-│           └── assess/             # AI assessment
-├── components/
-│   ├── featured-question.tsx       # Homepage showcase
-│   ├── freshness-badge.tsx         # State indicators
-│   └── verification-actions.tsx    # Vote buttons + AI
-├── lib/
-│   ├── freshness/
-│   │   ├── state-machine.ts        # Core decay logic
-│   │   └── engine.ts               # Verification processing
-│   ├── llm/
-│   │   ├── classifier.ts           # Question categorization
-│   │   └── verifier.ts             # Answer assessment
-│   └── foru-ms/
-│       └── client.ts               # Forum API wrapper
-\`\`\`
-
----
-
 ## Key Features
 
 ### Featured Question Algorithm
