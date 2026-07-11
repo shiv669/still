@@ -24,6 +24,18 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Check for API key first
+    if (!process.env.FORUMS_API_KEY) {
+      console.error("[v0] CRITICAL: FORUMS_API_KEY not set in environment")
+      return NextResponse.json(
+        { 
+          error: "Server configuration error: FORUMS_API_KEY is missing",
+          details: "Please contact the administrator. The FORUMS_API_KEY environment variable must be set in production."
+        }, 
+        { status: 503 }
+      )
+    }
+
     const body = await request.json()
     const { title, content } = body
 

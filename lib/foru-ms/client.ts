@@ -4,7 +4,8 @@ import type { ThreadMetadata, PostMetadata } from "./types"
 const API_KEY = process.env.FORUMS_API_KEY
 
 if (!API_KEY) {
-  console.warn("[v0] FORUMS_API_KEY not set - Foru.ms integration may not work")
+  console.error("[v0] CRITICAL: FORUMS_API_KEY is not set in environment variables")
+  console.error("[v0] Please add FORUMS_API_KEY to your Vercel environment variables")
 }
 
 // Initialize the SDK with API key
