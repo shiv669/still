@@ -13,14 +13,25 @@ export function StillHeader() {
           <Link href="/" className="flex items-center gap-2">
             <img src={LOGO_URL || "/placeholder.svg"} alt="Still" className="h-8 sm:h-10 w-auto object-contain" />
           </Link>
-          <Link href="/questions/new">
-            <Button
-              size="sm"
-              className="rounded-full bg-[#fafafa] text-[#030303] hover:bg-[#e5e5e5] h-8 sm:h-9 px-3 sm:px-4 text-xs sm:text-sm"
-            >
-              Ask Question
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/certificate">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 rounded-full border-[#2a2a2a] bg-transparent px-3 text-xs text-[#fafafa] hover:bg-[#151515] sm:h-9 sm:px-4 sm:text-sm"
+              >
+                Certificate
+              </Button>
+            </Link>
+            <Link href="/questions/new">
+              <Button
+                size="sm"
+                className="h-8 rounded-full bg-[#fafafa] px-3 text-xs text-[#030303] hover:bg-[#e5e5e5] sm:h-9 sm:px-4 sm:text-sm"
+              >
+                Ask Question
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
     </header>
