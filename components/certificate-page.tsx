@@ -4,10 +4,12 @@ import { useRef, useState } from "react"
 import Link from "next/link"
 import html2canvas from "html2canvas"
 import { jsPDF } from "jspdf"
-import { ArrowLeft, Download, FileImage, FileText, Loader2 } from "lucide-react"
+import { ArrowLeft, Download, FileImage, FileText, Loader2, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
-const LOGO_URL = "/images/1000103934.png"
+const STILL_LOGO_URL = "/images/1000103934.png"
+const V0_LOGO_URL = "https://cdn.jsdelivr.net/gh/glincker/thesvg@main/public/icons/v0/light.svg"
+const VERCEL_LOGO_URL = "https://cdn.jsdelivr.net/gh/glincker/thesvg@main/public/icons/vercel/light.svg"
 const DEVPOST_URL = "https://devpost.com/software/still-439yo7"
 
 export function CertificatePage() {
@@ -16,12 +18,7 @@ export function CertificatePage() {
 
   async function renderCertificate() {
     if (!certificateRef.current) return null
-    return html2canvas(certificateRef.current, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: "#080808",
-      logging: false,
-    })
+    return html2canvas(certificateRef.current, { scale: 2, useCORS: true, backgroundColor: "#f5f4ef", logging: false })
   }
 
   async function downloadPng() {
@@ -33,9 +30,7 @@ export function CertificatePage() {
       link.download = "still-featured-winner-certificate.png"
       link.href = canvas.toDataURL("image/png")
       link.click()
-    } finally {
-      setExporting(null)
-    }
+    } finally { setExporting(null) }
   }
 
   async function downloadPdf() {
@@ -46,71 +41,54 @@ export function CertificatePage() {
       const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" })
       pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, 297, 210)
       pdf.save("still-featured-winner-certificate.pdf")
-    } finally {
-      setExporting(null)
-    }
+    } finally { setExporting(null) }
   }
 
   return (
     <main className="min-h-screen bg-[#030303] px-4 py-5 text-[#fafafa] sm:px-6 sm:py-8">
       <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <Link href="/" className="inline-flex items-center gap-2 text-sm text-[#8a8a8a] transition-colors hover:text-[#fafafa]">
-            <ArrowLeft data-icon="inline-start" /> Back to Still
-          </Link>
+          <Link href="/" className="inline-flex items-center gap-2 text-sm text-[#8a8a8a] transition-colors hover:text-[#fafafa]"><ArrowLeft data-icon="inline-start" /> Back to Still</Link>
           <div className="flex items-center gap-2">
-            <Button onClick={downloadPng} disabled={Boolean(exporting)} variant="outline" className="border-[#2a2a2a] bg-[#0a0a0a] text-[#fafafa] hover:bg-[#151515]">
-              {exporting === "png" ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <FileImage data-icon="inline-start" />}
-              PNG
-            </Button>
-            <Button onClick={downloadPdf} disabled={Boolean(exporting)} className="bg-[#fafafa] text-[#030303] hover:bg-[#e5e5e5]">
-              {exporting === "pdf" ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <FileText data-icon="inline-start" />}
-              PDF
-            </Button>
+            <Button onClick={downloadPng} disabled={Boolean(exporting)} variant="outline" className="border-[#2a2a2a] bg-[#0a0a0a] text-[#fafafa] hover:bg-[#151515]">{exporting === "png" ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <FileImage data-icon="inline-start" />} PNG</Button>
+            <Button onClick={downloadPdf} disabled={Boolean(exporting)} className="bg-[#fafafa] text-[#030303] hover:bg-[#e5e5e5]">{exporting === "pdf" ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <FileText data-icon="inline-start" />} PDF</Button>
           </div>
         </div>
 
-        <section aria-label="Certificate preview" className="flex justify-center overflow-hidden rounded-xl border border-[#1a1a1a] bg-[#080808] p-2 shadow-2xl shadow-black/30 sm:p-5">
-          <div ref={certificateRef} className="certificate-shell relative aspect-[297/210] w-full max-w-[1122px] overflow-hidden bg-[#080808] text-[#f5f5f0]">
-            <div className="absolute inset-[2.2%] border border-[#343434]" />
-            <div className="absolute inset-[3.2%] border border-[#171717]" />
-            <div className="absolute left-[3.2%] top-[3.2%] h-20 w-20 border-l border-t border-[#7d7d72] sm:h-28 sm:w-28" />
-            <div className="absolute bottom-[3.2%] right-[3.2%] h-20 w-20 border-b border-r border-[#7d7d72] sm:h-28 sm:w-28" />
+        <section aria-label="Certificate preview" className="overflow-auto rounded-xl border border-[#1a1a1a] bg-[#080808] p-2 shadow-2xl shadow-black/30 sm:p-5">
+          <div ref={certificateRef} className="certificate-shell relative mx-auto aspect-[297/210] w-full min-w-[760px] max-w-[1122px] overflow-hidden bg-[#f5f4ef] text-[#111110]">
+            <div className="absolute inset-[2.6%] border border-[#b8b6ae]" />
+            <div className="absolute inset-[3.35%] border border-[#dedcd4]" />
+            <div className="absolute left-[3.35%] top-[3.35%] h-[15%] w-[11%] border-l border-t border-[#88877f]" />
+            <div className="absolute bottom-[3.35%] right-[3.35%] h-[15%] w-[11%] border-b border-r border-[#88877f]" />
+            <div className="absolute right-[8%] top-[18%] font-mono text-[clamp(7px,0.72vw,10px)] tracking-[0.32em] text-[#a2a098] [writing-mode:vertical-rl]">STILL / RECOGNITION / 2026</div>
 
             <div className="relative flex h-full flex-col px-[9%] py-[8%] sm:px-[11%] sm:py-[7.5%]">
-              <div className="flex items-start justify-between">
-                <img src={LOGO_URL} alt="Still" className="h-7 w-auto object-contain opacity-90 sm:h-10" />
-                <div className="text-right font-mono text-[7px] uppercase tracking-[0.22em] text-[#77776f] sm:text-[9px]">Official recognition / 2026</div>
+              <header className="flex items-start justify-between border-b border-[#d3d1c9] pb-[4%]">
+                <div className="flex items-center gap-4">
+                  <img src={STILL_LOGO_URL} alt="Still" className="h-9 w-auto object-contain brightness-0 opacity-85 sm:h-11" />
+                  <span className="h-7 w-px bg-[#c8c6bd]" />
+                  <div className="flex items-center gap-2 text-[#242421]"><img src={V0_LOGO_URL} alt="v0" className="h-4 w-4 object-contain brightness-0" /><span className="font-sans text-[clamp(9px,1vw,13px)] font-semibold tracking-[-0.04em]">v0</span></div>
+                </div>
+                <div className="flex items-center gap-2 text-[#6e6d67]"><img src={VERCEL_LOGO_URL} alt="Vercel" className="h-3.5 w-3.5 object-contain brightness-0" /><span className="font-mono text-[clamp(7px,0.7vw,10px)] uppercase tracking-[0.2em]">Vercel</span></div>
+              </header>
+
+              <div className="my-auto max-w-[76%] py-[3%]">
+                <p className="mb-3 font-mono text-[clamp(8px,0.9vw,12px)] font-medium uppercase tracking-[0.34em] text-[#75736b] sm:mb-5">v0 by Vercel Hackathon</p>
+                <h1 className="font-sans text-[clamp(2.1rem,6.4vw,5.8rem)] font-semibold leading-[0.86] tracking-[-0.085em] text-[#111110]">FEATURED<br />WINNER</h1>
+                <div className="mt-5 h-px w-20 bg-[#171715] sm:mt-8" />
+                <p className="mt-4 max-w-[650px] font-sans text-[clamp(0.7rem,1.3vw,1.1rem)] leading-[1.5] text-[#4c4b46] sm:mt-6">Presented in recognition of being selected as a Featured Winner for the project <span className="font-medium text-[#111110]">“Still”</span> in the v0 by Vercel Hackathon.</p>
               </div>
 
-              <div className="my-auto max-w-[760px]">
-                <p className="mb-3 font-mono text-[8px] font-medium uppercase tracking-[0.35em] text-[#8b8b82] sm:mb-5 sm:text-[11px]">v0 by Vercel Hackathon</p>
-                <h1 className="font-sans text-[clamp(2rem,6vw,5.5rem)] font-semibold leading-[0.9] tracking-[-0.07em] text-[#fafaf5]">FEATURED<br />WINNER</h1>
-                <div className="mt-5 h-px w-14 bg-[#d8d8cc] sm:mt-8 sm:w-20" />
-                <p className="mt-4 max-w-[590px] font-sans text-[clamp(0.72rem,1.35vw,1.1rem)] leading-relaxed text-[#b6b6ae] sm:mt-6">
-                  Presented in recognition of being selected as a Featured Winner for the project <span className="text-[#f5f5f0]">“Still”</span> in the v0 by Vercel Hackathon.
-                </p>
+              <div className="grid grid-cols-[0.8fr_1.2fr] gap-8 border-t border-[#c9c7bf] pt-[3.5%] sm:gap-16">
+                <div><p className="mb-2 font-mono text-[clamp(7px,0.72vw,10px)] uppercase tracking-[0.28em] text-[#88867e]">Presented to</p><p className="font-sans text-[clamp(1.05rem,2.2vw,1.95rem)] font-medium tracking-[-0.055em] text-[#111110]">Shivam Gawali</p></div>
+                <div><p className="mb-2 font-mono text-[clamp(7px,0.72vw,10px)] uppercase tracking-[0.28em] text-[#88867e]">Project / Still</p><p className="max-w-[520px] font-sans text-[clamp(0.62rem,0.95vw,0.84rem)] leading-[1.45] text-[#55544e]">A forum designed to prevent outdated answers from retaining trust by introducing time based answer freshness and community verification.</p></div>
               </div>
 
-              <div className="grid grid-cols-[1.2fr_1fr] items-end gap-6 border-t border-[#292929] pt-4 sm:gap-12 sm:pt-6">
-                <div>
-                  <p className="mb-1 font-mono text-[7px] uppercase tracking-[0.28em] text-[#72726b] sm:text-[9px]">Presented to</p>
-                  <p className="font-sans text-[clamp(1rem,2.1vw,1.8rem)] font-medium tracking-[-0.04em] text-[#fafaf5]">Shivam Gawali</p>
-                </div>
-                <div className="text-right">
-                  <p className="mb-1 font-mono text-[7px] uppercase tracking-[0.28em] text-[#72726b] sm:text-[9px]">Project / Still</p>
-                  <p className="line-clamp-2 font-sans text-[clamp(0.62rem,1vw,0.86rem)] leading-snug text-[#a8a8a0]">A forum designed to prevent outdated answers from retaining trust by introducing time based answer freshness and community verification.</p>
-                </div>
-              </div>
-
-              <div className="mt-4 flex items-end justify-between gap-4 sm:mt-6">
-                <div className="min-w-0">
-                  <p className="mb-1 font-mono text-[7px] uppercase tracking-[0.25em] text-[#72726b] sm:text-[9px]">Verification</p>
-                  <p className="truncate text-[clamp(0.5rem,0.9vw,0.75rem)] text-[#92928b]">Official verification: Devpost project submission</p>
-                  <a href={DEVPOST_URL} target="_blank" rel="noreferrer" className="mt-1 block truncate font-mono text-[clamp(0.45rem,0.8vw,0.68rem)] text-[#77776f] underline decoration-[#4a4a43] underline-offset-2">{DEVPOST_URL}</a>
-                </div>
-                <div className="shrink-0 text-right font-mono text-[7px] uppercase tracking-[0.18em] text-[#6f6f68] sm:text-[9px]">Still / v0</div>
-              </div>
+              <footer className="mt-[3.5%] grid grid-cols-[1fr_auto] items-end gap-8 border-t border-[#d3d1c9] pt-[2.5%]">
+                <div className="min-w-0"><p className="mb-1.5 font-mono text-[clamp(7px,0.7vw,10px)] uppercase tracking-[0.25em] text-[#88867e]">Official verification</p><p className="font-sans text-[clamp(0.57rem,0.82vw,0.72rem)] text-[#5c5b55]">Devpost project submission</p><a href={DEVPOST_URL} target="_blank" rel="noreferrer" className="mt-1 flex min-w-0 items-center gap-1 font-mono text-[clamp(0.52rem,0.72vw,0.65rem)] leading-snug text-[#77756e] underline decoration-[#aaa89f] underline-offset-2"><span className="break-all">{DEVPOST_URL}</span><ExternalLink className="size-3 shrink-0" /></a></div>
+                <div className="flex items-center gap-2 pb-1 font-mono text-[clamp(7px,0.7vw,10px)] uppercase tracking-[0.18em] text-[#8d8b83]"><span className="size-1.5 rounded-full bg-[#111110]" /> Featured Winner</div>
+              </footer>
             </div>
           </div>
         </section>
