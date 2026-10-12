@@ -17,7 +17,7 @@ async function callGroqAPI(prompt: string, maxTokens = 500): Promise<string> {
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       // This is a current production model. It can be overridden without a code change.
-      model: process.env.GROQ_MODEL || "llama-3.1-8b-instant",
+      model: process.env.GROQ_MODEL || "openai/gpt-oss-20b",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.3,
       max_tokens: maxTokens,
