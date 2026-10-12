@@ -1,33 +1,21 @@
-import { ForumClient } from "@foru-ms/sdk"
+import { Pool } from "pg"
 import type { ThreadMetadata, PostMetadata } from "./types"
 
-const API_KEY = process.env.FORUMS_API_KEY
+const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+const SYSTEM_USER_ID = "00000000-0000-0000-0000-000000000001"
 
-if (!API_KEY) {
-  console.warn("[v0] FORUMS_API_KEY not set - Foru.ms integration may not work")
-}
-
-// Initialize the SDK with API key
-const client = new ForumClient({
-  apiKey: API_KEY || "",
-})
-
-// Thread interface matching Foru.ms API response
 export interface ForumsThread {
   id: string
   title: string
   body: string
-  slug?: string
-  locked?: boolean
-  pinned?: boolean
+  locked: boolean
+  pinned: boolean
   user?: { id: string; username: string; avatar?: string }
-  tags?: Array<{ id: string; name: string }>
   createdAt: string
   updatedAt: string
   extendedData?: ThreadMetadata
 }
 
-// Post interface matching Foru.ms API response
 export interface ForumsPost {
   id: string
   body: string
@@ -39,265 +27,121 @@ export interface ForumsPost {
   extendedData?: PostMetadata
 }
 
-let cachedUser: { id: string; token: string } | null = null
-
-const lastRegistrationCredentials: { email: string; password: string } | null = null
-
-async function getOrCreateAuthenticatedUser(): Promise<{ id: string; token: string }> {
-  if (cachedUser) {
-    // Set the token for authenticated requests
-    client.setToken(cachedUser.token)
-    return cachedUser
+function mapThread(row: Record<string, any>): ForumsThread {
+  return {
+    id: row.id,
+    title: row.title,
+    body: row.body,
+    locked: row.locked,
+    pinned: row.pinned,
+    user: row.user_id ? { id: row.user_id, username: row.display_name } : undefined,
+    createdAt: new Date(row.created_at).toISOString(),
+    updatedAt: new Date(row.updated_at).toISOString(),
+    extendedData: row.extended_data || undefined,
   }
+}
 
-  const timestamp = Date.now()
-  const randomStr = Math.random().toString(36).slice(2, 8)
-  const email = `still_${timestamp}_${randomStr}@still.forum`
-  const username = `still_user_${randomStr}`
-  const password = `StillPass_${timestamp}!Aa1`
-
-  try {
-    // First try to list existing users to use one
-    console.log("[v0] Checking for existing users...")
-    const usersResponse = await client.users.list({})
-
-    if (usersResponse.users && usersResponse.users.length > 0) {
-      const existingUser = usersResponse.users[0]
-      console.log("[v0] Found existing user:", existingUser.id)
-
-      cachedUser = { id: existingUser.id, token: "" }
-      return cachedUser
-    }
-
-    // No existing users, register a new one
-    console.log("[v0] No existing users, registering new user...")
-
-    try {
-      const registerResponse = await client.auth.register({
-        email,
-        username,
-        password,
-      })
-
-      console.log("[v0] Registration response:", JSON.stringify(registerResponse))
-
-      console.log("[v0] Registration complete, logging in to get token...")
-      const loginResponse = await client.auth.login({
-        login: email,
-        password,
-      })
-
-      if (loginResponse && loginResponse.token) {
-        client.setToken(loginResponse.token)
-        const me = await client.auth.me()
-        cachedUser = { id: me.id, token: loginResponse.token }
-        console.log("[v0] Logged in successfully, user:", cachedUser.id)
-        return cachedUser
-      }
-
-      // If login didn't return token but register returned user info
-      if (registerResponse && (registerResponse as any).user) {
-        const userId = (registerResponse as any).user.id
-        console.log("[v0] Using user ID from registration:", userId)
-        cachedUser = { id: userId, token: "" }
-        return cachedUser
-      }
-
-      throw new Error("Could not get user ID or token")
-    } catch (regError: unknown) {
-      const err = regError as Error
-      console.log("[v0] Registration/login error:", err.message)
-
-      if (err.message.includes("already exists")) {
-        console.log("[v0] User exists, trying to list users again...")
-        const retryUsers = await client.users.list({})
-        if (retryUsers.users && retryUsers.users.length > 0) {
-          const existingUser = retryUsers.users[0]
-          console.log("[v0] Using existing user:", existingUser.id)
-          cachedUser = { id: existingUser.id, token: "" }
-          return cachedUser
-        }
-      }
-      throw err
-    }
-  } catch (error: unknown) {
-    const err = error as Error
-    console.error("[v0] Auth error:", err.message)
-    throw new Error(`Cannot create user: ${err.message}`)
+function mapPost(row: Record<string, any>): ForumsPost {
+  return {
+    id: row.id,
+    body: row.body,
+    threadId: row.thread_id,
+    userId: row.user_id,
+    user: row.display_name ? { id: row.user_id, username: row.display_name } : undefined,
+    createdAt: new Date(row.created_at).toISOString(),
+    updatedAt: new Date(row.updated_at).toISOString(),
+    extendedData: row.extended_data || undefined,
   }
+}
+
+async function ensureSystemUser() {
+  await pool.query(
+    `INSERT INTO public.forum_users (id, display_name) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING`,
+    [SYSTEM_USER_ID, "Question Author"],
+  )
+  return SYSTEM_USER_ID
 }
 
 export async function getOrCreateUser(displayName: string): Promise<string> {
-  const user = await getOrCreateAuthenticatedUser()
-  return user.id
+  await pool.query(
+    `INSERT INTO public.forum_users (id, display_name) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET display_name = EXCLUDED.display_name`,
+    [SYSTEM_USER_ID, displayName.trim().slice(0, 80) || "Question Author"],
+  )
+  return SYSTEM_USER_ID
 }
 
-// Unified client interface wrapping the SDK
 export const forumsClient = {
   threads: {
-    async create(data: {
-      title: string
-      body: string
-      userId?: string
-      extendedData?: ThreadMetadata
-    }): Promise<ForumsThread> {
-      console.log("[v0] Creating thread:", { title: data.title.substring(0, 50) })
-
-      const user = await getOrCreateAuthenticatedUser()
-
-      const payload = {
-        title: data.title,
-        body: data.body,
-        userId: user.id,
-        extendedData: data.extendedData as Record<string, unknown>,
-      }
-
-      console.log("[v0] Thread payload:", {
-        title: payload.title.substring(0, 30),
-        userId: payload.userId,
-        hasExtendedData: !!payload.extendedData,
-      })
-
-      try {
-        const thread = await client.threads.create(payload)
-        console.log("[v0] Thread created successfully:", thread.id)
-        return thread as unknown as ForumsThread
-      } catch (error: unknown) {
-        const err = error as Error
-        console.error("[v0] Thread creation error:", err.message)
-        throw new Error(`Failed to create thread: ${err.message}`)
-      }
+    async create(data: { title: string; body: string; userId?: string; extendedData?: ThreadMetadata }): Promise<ForumsThread> {
+      const userId = data.userId || (await ensureSystemUser())
+      const result = await pool.query(
+        `INSERT INTO public.forum_threads (title, body, user_id, extended_data) VALUES ($1, $2, $3, $4) RETURNING id, title, body, user_id, locked, pinned, extended_data, created_at, updated_at`,
+        [data.title.trim(), data.body.trim(), userId, data.extendedData || {}],
+      )
+      return mapThread(result.rows[0])
     },
-
     async retrieve(id: string): Promise<ForumsThread> {
-      console.log("[v0] Retrieving thread:", id)
-      try {
-        const thread = await client.threads.retrieve(id)
-        return thread as unknown as ForumsThread
-      } catch (error: unknown) {
-        const err = error as Error
-        console.error("[v0] Thread retrieve error:", err.message)
-        throw new Error("Thread not found")
-      }
+      const result = await pool.query(
+        `SELECT t.*, u.display_name FROM public.forum_threads t JOIN public.forum_users u ON u.id = t.user_id WHERE t.id = $1`,
+        [id],
+      )
+      if (!result.rows[0]) throw new Error("Thread not found")
+      return mapThread(result.rows[0])
     },
-
     async list(options?: { limit?: number; page?: number }): Promise<{ threads: ForumsThread[]; count: number }> {
-      console.log("[v0] Listing threads...")
-      try {
-        const response = await client.threads.list({
-          limit: options?.limit || 20,
-        })
-
-        console.log("[v0] Got", response.threads?.length || 0, "threads")
-
-        return {
-          threads: (response.threads || []) as unknown as ForumsThread[],
-          count: response.threads?.length || 0,
-        }
-      } catch (error: unknown) {
-        const err = error as Error
-        console.error("[v0] Thread list error:", err.message)
-        return { threads: [], count: 0 }
-      }
+      const limit = Math.min(Math.max(options?.limit || 20, 1), 100)
+      const page = Math.max(options?.page || 1, 1)
+      const offset = (page - 1) * limit
+      const result = await pool.query(
+        `SELECT t.*, u.display_name, count(*) OVER()::int AS total_count FROM public.forum_threads t JOIN public.forum_users u ON u.id = t.user_id ORDER BY t.pinned DESC, t.created_at DESC LIMIT $1 OFFSET $2`,
+        [limit, offset],
+      )
+      return { threads: result.rows.map(mapThread), count: result.rows[0]?.total_count || 0 }
     },
-
     async update(id: string, data: Partial<ForumsThread>): Promise<ForumsThread> {
-      try {
-        const thread = await client.threads.update(id, {
-          title: data.title,
-          body: data.body,
-          extendedData: data.extendedData as Record<string, unknown>,
-        })
-        return thread as unknown as ForumsThread
-      } catch (error: unknown) {
-        const err = error as Error
-        console.error("[v0] Thread update error:", err.message)
-        throw error
-      }
+      const result = await pool.query(
+        `UPDATE public.forum_threads SET title = COALESCE($2, title), body = COALESCE($3, body), extended_data = COALESCE($4, extended_data), updated_at = now() WHERE id = $1 RETURNING *`,
+        [id, data.title, data.body, data.extendedData],
+      )
+      if (!result.rows[0]) throw new Error("Thread not found")
+      return mapThread(result.rows[0])
     },
-
-    async getPosts(threadId: string, options?: object): Promise<{ posts: ForumsPost[] }> {
-      console.log("[v0] Getting posts for thread:", threadId)
-      try {
-        const response = await client.threads.getPosts(threadId, options || {})
-        return {
-          posts: (response.posts || []) as unknown as ForumsPost[],
-        }
-      } catch (error: unknown) {
-        const err = error as Error
-        console.error("[v0] Get posts error:", err.message)
-        return { posts: [] }
-      }
+    async getPosts(threadId: string): Promise<{ posts: ForumsPost[] }> {
+      const result = await pool.query(
+        `SELECT p.*, u.display_name FROM public.forum_posts p JOIN public.forum_users u ON u.id = p.user_id WHERE p.thread_id = $1 ORDER BY p.created_at ASC`,
+        [threadId],
+      )
+      return { posts: result.rows.map(mapPost) }
     },
   },
-
   posts: {
-    async create(data: {
-      threadId: string
-      body: string
-      userId?: string
-      extendedData?: PostMetadata
-    }): Promise<ForumsPost> {
-      console.log("[v0] Creating post for thread:", data.threadId)
-
-      const user = await getOrCreateAuthenticatedUser()
-
-      try {
-        const post = await client.posts.create({
-          threadId: data.threadId,
-          body: data.body,
-          userId: user.id,
-          extendedData: data.extendedData as Record<string, unknown>,
-        })
-
-        console.log("[v0] Post created:", post.id)
-        return post as unknown as ForumsPost
-      } catch (error: unknown) {
-        const err = error as Error
-        console.error("[v0] Post creation error:", err.message)
-        throw error
-      }
+    async create(data: { threadId: string; body: string; userId?: string; extendedData?: PostMetadata }): Promise<ForumsPost> {
+      const userId = data.userId || (await ensureSystemUser())
+      const result = await pool.query(
+        `INSERT INTO public.forum_posts (thread_id, body, user_id, extended_data) VALUES ($1, $2, $3, $4) RETURNING *`,
+        [data.threadId, data.body.trim(), userId, data.extendedData || {}],
+      )
+      return mapPost(result.rows[0])
     },
-
     async retrieve(id: string): Promise<ForumsPost> {
-      try {
-        const post = await client.posts.retrieve(id)
-        return post as unknown as ForumsPost
-      } catch (error: unknown) {
-        const err = error as Error
-        console.error("[v0] Post retrieve error:", err.message)
-        throw new Error("Post not found")
-      }
+      const result = await pool.query(
+        `SELECT p.*, u.display_name FROM public.forum_posts p JOIN public.forum_users u ON u.id = p.user_id WHERE p.id = $1`,
+        [id],
+      )
+      if (!result.rows[0]) throw new Error("Post not found")
+      return mapPost(result.rows[0])
     },
-
     async update(id: string, data: Partial<ForumsPost>): Promise<ForumsPost> {
-      try {
-        const post = await client.posts.update(id, {
-          body: data.body,
-          extendedData: data.extendedData as Record<string, unknown>,
-        })
-        return post as unknown as ForumsPost
-      } catch (error: unknown) {
-        const err = error as Error
-        console.error("[v0] Post update error:", err.message)
-        throw error
-      }
+      const result = await pool.query(
+        `UPDATE public.forum_posts SET body = COALESCE($2, body), extended_data = COALESCE($3, extended_data), updated_at = now() WHERE id = $1 RETURNING *`,
+        [id, data.body, data.extendedData],
+      )
+      if (!result.rows[0]) throw new Error("Post not found")
+      return mapPost(result.rows[0])
     },
   },
-
-  users: {
-    async getOrCreate(displayName: string): Promise<{ id: string }> {
-      const user = await getOrCreateAuthenticatedUser()
-      return { id: user.id }
-    },
-  },
+  users: { async getOrCreate(displayName: string): Promise<{ id: string }> { return { id: await getOrCreateUser(displayName) } } },
 }
 
-// Helper functions
-export function getThreadMetadata(thread: ForumsThread): ThreadMetadata | undefined {
-  return thread.extendedData
-}
-
-export function getPostMetadata(post: ForumsPost): PostMetadata | undefined {
-  return post.extendedData
-}
+export function getThreadMetadata(thread: ForumsThread): ThreadMetadata | undefined { return thread.extendedData }
+export function getPostMetadata(post: ForumsPost): PostMetadata | undefined { return post.extendedData }

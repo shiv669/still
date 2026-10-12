@@ -1,5 +1,3 @@
-# **🏆 Winner (Featured Selection) — Vercel x Foru.ms Hackathon**
-
 # Still
 
 **A forum where answers expire unless they're still true.**
@@ -97,6 +95,38 @@ No maintenance needed. The system enforces honesty by default.
 
 ---
 
+## Project Structure
+
+\`\`\`
+still/
+├── app/
+│   ├── page.tsx                    # Home - featured question + recent threads
+│   ├── questions/
+│   │   ├── new/                    # Ask a new question
+│   │   └── [id]/                   # Question detail + answers
+│   │       └── answer/             # Submit an answer
+│   └── api/
+│       ├── threads/                # Create/list questions
+│       └── posts/[postId]/
+│           ├── verify/             # Community verification
+│           └── assess/             # AI assessment
+├── components/
+│   ├── featured-question.tsx       # Homepage showcase
+│   ├── freshness-badge.tsx         # State indicators
+│   └── verification-actions.tsx    # Vote buttons + AI
+├── lib/
+│   ├── freshness/
+│   │   ├── state-machine.ts        # Core decay logic
+│   │   └── engine.ts               # Verification processing
+│   ├── llm/
+│   │   ├── classifier.ts           # Question categorization
+│   │   └── verifier.ts             # Answer assessment
+│   └── foru-ms/
+│       └── client.ts               # Forum API wrapper
+\`\`\`
+
+---
+
 ## Key Features
 
 ### Featured Question Algorithm
@@ -123,12 +153,25 @@ git clone <repo>
 cd still
 npm install
 
-# Add your Groq API key
+# Add your environment variables
 echo "GROQ_API_KEY=your_key_here" > .env.local
+echo "FORUMS_API_KEY=your_forums_api_key" >> .env.local
 
 # Run
 npm run dev
 \`\`\`
+
+## Deployment (Vercel)
+
+**Critical:** You MUST add these environment variables in Vercel:
+
+1. Go to your Vercel project
+2. Settings → Environment Variables
+3. Add:
+   - `FORUMS_API_KEY` = your Foru.ms API key
+   - `GROQ_API_KEY` = your Groq API key
+
+Without `FORUMS_API_KEY`, question creation will fail with a network error.
 
 ---
 
