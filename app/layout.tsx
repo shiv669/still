@@ -31,10 +31,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="bg-[#030303]">
-      <head>
-        <link rel="preconnect" href="https://api.foru.ms" />
-        <link rel="dns-prefetch" href="https://api.foru.ms" />
-      </head>
+
       <body className={`${inter.variable} font-sans antialiased bg-[#030303]`} style={{ backgroundColor: "#030303" }}>
         {children}
         <Analytics />
