@@ -10,22 +10,20 @@ export interface VerificationAssessment {
 
 async function callGroqAPI(prompt: string, maxTokens = 500): Promise<string> {
   const apiKey = process.env.GROQ_API_KEY
-  if (!apiKey) {
-    throw new Error("GROQ_API_KEY not configured")
-  }
+  if (!apiKey) throw new Error("GROQ_API_KEY not configured")
 
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "llama-3.3-70b-versatile",
+      // This is a current production model. It can be overridden without a code change.
+      model: process.env.GROQ_MODEL || "llama-3.1-8b-instant",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.3,
       max_tokens: maxTokens,
+      response_format: { type: "json_object" },
     }),
+    signal: AbortSignal.timeout(12000),
   })
 
   if (!response.ok) {
@@ -34,43 +32,30 @@ async function callGroqAPI(prompt: string, maxTokens = 500): Promise<string> {
   }
 
   const data = await response.json()
-  return data.choices[0]?.message?.content || ""
+  return data.choices?.[0]?.message?.content || ""
 }
 
 async function searchWeb(query: string): Promise<string[]> {
   try {
-    // Use a simple search approach - fetch from known documentation sources
-    const searchResults: string[] = []
+    const response = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
+      headers: { "User-Agent": "still-verifier/1.0 (+https://still.app)" },
+      signal: AbortSignal.timeout(8000),
+    })
+    if (!response.ok) throw new Error(`Search provider returned ${response.status}`)
 
-    // Try to fetch relevant documentation based on query keywords
-    const keywords = query.toLowerCase()
-
-    if (keywords.includes("next") || keywords.includes("nextjs")) {
-      searchResults.push(
-        "Source: Next.js Official Docs (nextjs.org/docs) - Check the latest App Router documentation for current patterns",
-      )
+    const html = await response.text()
+    const results: string[] = []
+    const resultPattern = /<a rel="nofollow" class="result__a" href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g
+    for (const match of html.matchAll(resultPattern)) {
+      const clean = (value: string) => value.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&#x27;/g, "'").replace(/&quot;/g, '"').trim()
+      const title = clean(match[2])
+      const snippet = clean(match[3])
+      if (title && snippet) results.push(`${title} — ${snippet} (${match[1]})`)
+      if (results.length === 5) break
     }
-    if (keywords.includes("react")) {
-      searchResults.push(
-        "Source: React Official Docs (react.dev) - React 18+ uses concurrent features and Server Components",
-      )
-    }
-    if (keywords.includes("typescript")) {
-      searchResults.push("Source: TypeScript Docs (typescriptlang.org) - Check latest version features")
-    }
-    if (keywords.includes("auth")) {
-      searchResults.push("Source: Auth.js/NextAuth (authjs.dev) - v5 has significant API changes from v4")
-    }
-    if (keywords.includes("tailwind")) {
-      searchResults.push("Source: Tailwind CSS (tailwindcss.com) - v4 has new features and config changes")
-    }
-    if (keywords.includes("api") || keywords.includes("route")) {
-      searchResults.push("Source: Next.js Route Handlers - App Router uses route.ts files instead of pages/api")
-    }
-
-    return searchResults
+    return results
   } catch (error) {
-    console.log("[v0] Web search failed:", error)
+    console.log("[v0] Live web search failed:", error)
     return []
   }
 }
