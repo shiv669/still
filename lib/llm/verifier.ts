@@ -115,7 +115,7 @@ Analyze this answer and determine:
 
 Be STRICT about accuracy. If an answer uses old patterns that have better alternatives, mark it as potentially outdated.
 
-Return ONLY one valid JSON object with exactly these keys. Do not use markdown, code fences, or extra text. Keep the reasoning field under 240 characters and include at most 3 short issues. Ensure the JSON is complete before stopping:
+Return exactly one complete JSON object with these keys only. Do not use markdown, code fences, or extra text. Keep reasoning under 240 characters and include no more than 3 short issues. Finish the object before stopping:
 {
   "is_outdated": true,
   "confidence_delta": 0,
