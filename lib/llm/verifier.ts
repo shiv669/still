@@ -8,7 +8,7 @@ export interface VerificationAssessment {
   sources_checked?: string[]
 }
 
-async function callGroqAPI(prompt: string, maxTokens = 500): Promise<string> {
+async function callGroqAPI(prompt: string, maxTokens = 700): Promise<string> {
   const apiKey = process.env.GROQ_API_KEY
   if (!apiKey) throw new Error("GROQ_API_KEY not configured")
 
@@ -115,15 +115,15 @@ Analyze this answer and determine:
 
 Be STRICT about accuracy. If an answer uses old patterns that have better alternatives, mark it as potentially outdated.
 
-Respond in JSON format:
+Return ONLY one valid JSON object with exactly these keys. Do not use markdown, code fences, or extra text. Keep `reasoning` under 240 characters and include at most 3 short issues. Ensure the JSON is complete before stopping:
 {
-  "is_outdated": true/false,
-  "confidence_delta": -1.0 to 1.0 (negative = outdated, positive = still valid),
-  "reasoning": "detailed explanation with specific technical details",
-  "potential_issues": ["specific issue 1", "specific issue 2"]
+  "is_outdated": true,
+  "confidence_delta": 0,
+  "reasoning": "brief explanation with the key technical detail",
+  "potential_issues": ["short issue"]
 }`
 
-    const text = await callGroqAPI(prompt, 800)
+    const text = await callGroqAPI(prompt, 1400)
 
     console.log("[v0] Groq API assessment response received")
 
