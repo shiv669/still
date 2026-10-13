@@ -8,7 +8,7 @@ export interface VerificationAssessment {
   sources_checked?: string[]
 }
 
-async function callGroqAPI(prompt: string, maxTokens = 500): Promise<string> {
+async function callGroqAPI(prompt: string, maxTokens = 700): Promise<string> {
   const apiKey = process.env.GROQ_API_KEY
   if (!apiKey) throw new Error("GROQ_API_KEY not configured")
 
@@ -17,7 +17,7 @@ async function callGroqAPI(prompt: string, maxTokens = 500): Promise<string> {
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       // This is a current production model. It can be overridden without a code change.
-      model: process.env.GROQ_MODEL || "llama-3.1-8b-instant",
+      model: process.env.GROQ_MODEL || "openai/gpt-oss-20b",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.3,
       max_tokens: maxTokens,
@@ -115,15 +115,15 @@ Analyze this answer and determine:
 
 Be STRICT about accuracy. If an answer uses old patterns that have better alternatives, mark it as potentially outdated.
 
-Respond in JSON format:
+Return exactly one complete JSON object with these keys only. Do not use markdown, code fences, or extra text. Keep reasoning under 240 characters and include no more than 3 short issues. Finish the object before stopping:
 {
-  "is_outdated": true/false,
-  "confidence_delta": -1.0 to 1.0 (negative = outdated, positive = still valid),
-  "reasoning": "detailed explanation with specific technical details",
-  "potential_issues": ["specific issue 1", "specific issue 2"]
+  "is_outdated": true,
+  "confidence_delta": 0,
+  "reasoning": "brief explanation with the key technical detail",
+  "potential_issues": ["short issue"]
 }`
 
-    const text = await callGroqAPI(prompt, 800)
+    const text = await callGroqAPI(prompt, 1400)
 
     console.log("[v0] Groq API assessment response received")
 
