@@ -1,5 +1,3 @@
-"use client"
-
 import Link from "next/link"
 const LOGO_URL = "/images/1000103934.png"
 
