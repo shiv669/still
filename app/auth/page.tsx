@@ -18,14 +18,16 @@ export default function AuthPage() {
     setError(null)
     try {
       const result = await authClient.signIn.magicLink({
-        email,
-        name: mode === "sign-up" ? name : undefined,
-        callbackURL: "/",
+        email: email.trim().toLowerCase(),
+        callbackURL: `${window.location.origin}/`,
       })
-      if (result.error) throw new Error(result.error.message || "We could not send that link.")
+      if (result.error) {
+        throw new Error(result.error.message || "We could not send that link.")
+      }
       setSent(true)
-    } catch {
-      setError("We could not send a sign-in link. Please check your email and try again.")
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "We could not send that link."
+      setError(message)
     } finally {
       setBusy(false)
     }
