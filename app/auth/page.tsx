@@ -17,15 +17,22 @@ export default function AuthPage() {
     setBusy(true)
     setError(null)
     try {
+      const normalizedEmail = email.trim().toLowerCase()
       const result = await authClient.signIn.magicLink({
-        email,
-        name: mode === "sign-up" ? name : undefined,
+        email: normalizedEmail,
         callbackURL: "/",
       })
-      if (result.error) throw new Error(result.error.message || "We could not send that link.")
+      if (result.error) {
+        throw new Error(result.error.message || "We could not send a sign-in link.")
+      }
       setSent(true)
-    } catch {
-      setError("We could not send a sign-in link. Please check your email and try again.")
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "We could not send a sign-in link."
+      setError(
+        message.includes("404")
+          ? "Magic links are not enabled for this Neon Auth project yet. Enable email magic links in Neon Auth, then try again."
+          : "We could not send a sign-in link. Please check your email address and try again.",
+      )
     } finally {
       setBusy(false)
     }
@@ -46,14 +53,15 @@ export default function AuthPage() {
           <div className="mb-8 text-center">
             <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white/[0.06] text-sm font-semibold">S</div>
             <h1 className="text-xl font-semibold tracking-tight">{mode === "sign-in" ? "Welcome back" : "Join Still"}</h1>
-            <p className="mt-2 text-sm leading-6 text-[#888]">{sent ? "Your secure link is on its way." : "Fresh answers for fast-changing technology."}</p>
+            <p className="mt-2 text-sm leading-6 text-[#888]">{sent ? "Check your inbox to continue securely." : "Fresh answers for fast-changing technology."}</p>
           </div>
 
           {sent ? (
-            <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/[0.06] p-5 text-center">
+            <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/[0.06] p-5">
               <Check className="mx-auto mb-3 h-6 w-6 text-emerald-300" />
-              <p className="text-sm text-[#ddd]">Check {email} for a magic link. It expires shortly and can only be used once.</p>
-              <button className="mt-5 text-sm text-white underline underline-offset-4" onClick={() => setSent(false)}>Use another email</button>
+              <p className="text-center text-sm text-[#ddd]">We sent a secure sign-in link to {email}. Open it in this browser to finish.</p>
+              <button className="mt-5 block w-full text-center text-sm text-white underline underline-offset-4" onClick={() => { setSent(false); setError(null) }}>Use another email</button>
+              {error && <p role="alert" className="mt-4 text-center text-xs text-red-300">{error}</p>}
             </div>
           ) : (
             <>
