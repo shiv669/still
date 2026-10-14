@@ -9,6 +9,7 @@ export default function AuthPage() {
   const [email, setEmail] = useState("")
   const [name, setName] = useState("")
   const [sent, setSent] = useState(false)
+  const [otp, setOtp] = useState("")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -17,16 +18,38 @@ export default function AuthPage() {
     setBusy(true)
     setError(null)
     try {
-      const result = await authClient.signIn.magicLink({
-        email: email.trim().toLowerCase(),
-        callbackURL: `${window.location.origin}/`,
+      const normalizedEmail = email.trim().toLowerCase()
+      const result = await authClient.emailOtp.sendVerificationOtp({
+        email: normalizedEmail,
+        type: "sign-in",
       })
       if (result.error) {
-        throw new Error(result.error.message || "We could not send that link.")
+        throw new Error(result.error.message || "We could not send a verification code.")
       }
       setSent(true)
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "We could not send that link."
+      const message = cause instanceof Error ? cause.message : "We could not send a verification code."
+      setError(message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function verifyOtp(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setBusy(true)
+    setError(null)
+    try {
+      const result = await authClient.signIn.emailOtp({
+        email: email.trim().toLowerCase(),
+        otp: otp.trim(),
+      })
+      if (result.error) {
+        throw new Error(result.error.message || "That verification code is invalid or expired.")
+      }
+      window.location.assign("/")
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "That verification code is invalid or expired."
       setError(message)
     } finally {
       setBusy(false)
@@ -48,14 +71,20 @@ export default function AuthPage() {
           <div className="mb-8 text-center">
             <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white/[0.06] text-sm font-semibold">S</div>
             <h1 className="text-xl font-semibold tracking-tight">{mode === "sign-in" ? "Welcome back" : "Join Still"}</h1>
-            <p className="mt-2 text-sm leading-6 text-[#888]">{sent ? "Your secure link is on its way." : "Fresh answers for fast-changing technology."}</p>
+            <p className="mt-2 text-sm leading-6 text-[#888]">{sent ? "Enter the verification code from your email." : "Fresh answers for fast-changing technology."}</p>
           </div>
 
           {sent ? (
-            <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/[0.06] p-5 text-center">
+            <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/[0.06] p-5">
               <Check className="mx-auto mb-3 h-6 w-6 text-emerald-300" />
-              <p className="text-sm text-[#ddd]">Check {email} for a magic link. It expires shortly and can only be used once.</p>
-              <button className="mt-5 text-sm text-white underline underline-offset-4" onClick={() => setSent(false)}>Use another email</button>
+              <p className="text-center text-sm text-[#ddd]">We sent a one-time verification code to {email}.</p>
+              <form onSubmit={verifyOtp} className="mt-4 space-y-3">
+                <label htmlFor="verification-code" className="sr-only">Verification code</label>
+                <input id="verification-code" value={otp} onChange={(event) => setOtp(event.target.value)} required inputMode="numeric" autoComplete="one-time-code" placeholder="Enter code" className="h-11 w-full rounded-lg border border-white/10 bg-black/40 px-3 text-center text-sm tracking-[0.35em] outline-none placeholder:text-[#666] placeholder:tracking-normal focus:border-white/30" />
+                <button disabled={busy} className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#ededed] text-sm font-medium text-black transition hover:bg-white disabled:cursor-wait disabled:opacity-60">{busy ? "Verifying…" : "Verify and continue"}<ArrowRight className="h-4 w-4" /></button>
+              </form>
+              <button className="mt-5 block w-full text-center text-sm text-white underline underline-offset-4" onClick={() => { setSent(false); setOtp(""); setError(null) }}>Use another email</button>
+              {error && <p role="alert" className="mt-4 text-center text-xs text-red-300">{error}</p>}
             </div>
           ) : (
             <>
