@@ -30,8 +30,10 @@ export default function AuthPage() {
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "We could not send a sign-in link."
       setError(
-        message.includes("535") || message.includes("EAUTH")
-          ? "Email delivery is not configured correctly. The Brevo SMTP password must be your Brevo SMTP key, not your Brevo API key."
+        message.includes("525")
+          ? "Brevo is blocking this server IP. Disable SMTP IP restriction in Brevo under Security, or remove the IP allowlist, then try again."
+          : message.includes("535") || message.includes("EAUTH")
+            ? "Email delivery is not configured correctly. The Brevo SMTP password must be your Brevo SMTP key, not your Brevo API key."
           : message.includes("404")
             ? "Magic links are not enabled for this Neon Auth project yet. Enable email magic links in Neon Auth, then try again."
             : "We could not send a sign-in link. Please check your email address and try again.",
