@@ -30,9 +30,11 @@ export default function AuthPage() {
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "We could not send a sign-in link."
       setError(
-        message.includes("404")
-          ? "Magic links are not enabled for this Neon Auth project yet. Enable email magic links in Neon Auth, then try again."
-          : "We could not send a sign-in link. Please check your email address and try again.",
+        message.includes("535") || message.includes("EAUTH")
+          ? "Email delivery is not configured correctly. The Brevo SMTP password must be your Brevo SMTP key, not your Brevo API key."
+          : message.includes("404")
+            ? "Magic links are not enabled for this Neon Auth project yet. Enable email magic links in Neon Auth, then try again."
+            : "We could not send a sign-in link. Please check your email address and try again.",
       )
     } finally {
       setBusy(false)
@@ -80,7 +82,7 @@ export default function AuthPage() {
               {error && <p role="alert" className="mt-4 text-center text-xs text-red-300">{error}</p>}
             </>
           )}
-          <div className="mt-8 flex items-center justify-center gap-2 text-center text-xs text-[#666]"><ShieldCheck className="h-3.5 w-3.5" /> Passwordless and securely managed by Neon Auth.</div>
+          <div className="mt-8 flex items-center justify-center gap-2 text-center text-xs text-[#666]"><ShieldCheck className="h-3.5 w-3.5" /> Passwordless sign-in with secure email delivery.</div>
         </div>
       </section>
     </main>
