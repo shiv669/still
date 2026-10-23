@@ -20,7 +20,8 @@ export default function AuthPage() {
       const normalizedEmail = email.trim().toLowerCase()
       const result = await authClient.signIn.magicLink({
         email: normalizedEmail,
-        callbackURL: "/",
+        name: mode === "sign-up" ? name.trim() : undefined,
+        callbackURL: `${window.location.origin}/`,
       })
       if (result.error) {
         throw new Error(result.error.message || "We could not send a sign-in link.")
