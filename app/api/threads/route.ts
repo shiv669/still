@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { forumsClient, getOrCreateUser } from "@/lib/foru-ms/client"
 import { QuestionClassifier } from "@/lib/llm/classifier"
+import { auth } from "@/lib/auth/server"
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,6 +24,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const session = await auth.api.getSession({ headers: request.headers })
+  if (!session?.user) return NextResponse.json({ error: "Authentication required" }, { status: 401 })
   try {
     const body = await request.json()
     const { title, content } = body
@@ -55,7 +58,7 @@ export async function POST(request: NextRequest) {
 
     // Get or create user first
     console.log(`[v0] Getting/creating user...`)
-    const userId = await getOrCreateUser("Question Author")
+    const userId = await getOrCreateUser(session.user.name || session.user.email)
     console.log(`[v0] User ID: ${userId}`)
 
     // Create the thread

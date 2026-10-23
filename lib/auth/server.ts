@@ -19,6 +19,7 @@ const baseURL = process.env.BETTER_AUTH_URL
 export const auth = betterAuth({
   database: pool,
   baseURL,
+  // Reuse the existing Neon secret when BETTER_AUTH_SECRET is not provisioned.
   secret: process.env.BETTER_AUTH_SECRET || process.env.NEON_AUTH_COOKIE_SECRET,
   trustedOrigins: [
     baseURL,

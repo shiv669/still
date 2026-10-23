@@ -10,8 +10,8 @@ export function StillHeader() {
             <img src={LOGO_URL || "/placeholder.svg"} alt="Still" className="h-8 sm:h-10 w-auto object-contain" />
           </Link>
           <div className="flex items-center gap-2">
-            <Link href="/auth" className="rounded-full px-3 py-2 text-xs text-[#aaa] transition hover:bg-white/[0.06] hover:text-white sm:text-sm">
-              Sign in
+            <Link href="/profile" aria-label="Open your profile" className="rounded-full px-3 py-2 text-xs text-[#aaa] transition hover:bg-white/[0.06] hover:text-white sm:text-sm">
+              Profile
             </Link>
             <Link
               href="/questions/new"

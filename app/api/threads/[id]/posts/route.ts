@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { forumsClient, getOrCreateUser } from "@/lib/foru-ms/client"
 import { getDefaultFreshnessMetadata } from "@/lib/freshness/state-machine"
+import { auth } from "@/lib/auth/server"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -17,6 +18,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth.api.getSession({ headers: request.headers })
+  if (!session?.user) return NextResponse.json({ error: "Authentication required" }, { status: 401 })
   try {
     const { id: threadId } = await params
     const body = await request.json()
@@ -26,7 +29,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: "Content is required" }, { status: 400 })
     }
 
-    const authorId = await getOrCreateUser("Answer Author")
+    const authorId = await getOrCreateUser(session.user.name || session.user.email)
 
     const thread = await forumsClient.threads.retrieve(threadId)
     const questionType = thread.extendedData?.question_type || "stable-concept"
